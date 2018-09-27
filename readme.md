@@ -71,8 +71,38 @@ This project simulates a network via Mininet and forwards OpenFlow data to Elast
     ```bash
     maven clean install
     ```
-14. **UNTESTED**: Install app...
-15. Access Kibana at:
+14. Install the application (Whilst running `onos`):
+    ```bash
+    onos-app localhost install path/to/coms4200-1.10.0.oar
+    ```
+15. Activate the application and de-activate conflicting ones:
+    ```bash
+    onos> apps activate org.coms4200.app
+    onos> apps deactivate org.onosproject.fwd
+    onos> apps deactivate org.onosproject.proxyarp
+    ```
+16. Access Kibana at:
     ```bash
     http://<ip-address>:5601/app/kibana
+    ```
+
+## Running everything after initial install
+
+1. Open 4 terminals on the VM
+2. In terminal #1 (Onos)
+    ```bash
+    cd ~/onos && onos-buck run onos-local -- clean
+    ```
+3. In terminal #2 (Mininet CLI)
+    ```bash
+    sudo mn --topo single,3 --mac --controller remote
+    # Or other applicable `mn` command
+    ```
+4. In terminal #3 (Onos CLI)
+    ```bash
+    onos localhost
+    ```
+5. In terminal #4 (General purpose)
+    ```bash
+    onos localhost install path/to/coms4200-1.10.0.oar
     ```
