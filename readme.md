@@ -72,3 +72,7 @@ This project simulates a network via Mininet and forwards OpenFlow data to Elast
     maven clean install
     ```
 14. **UNTESTED**: Install app...
+15. Access Kibana at:
+    ```bash
+    http://<ip-address>:5601/app/kibana
+    ```
