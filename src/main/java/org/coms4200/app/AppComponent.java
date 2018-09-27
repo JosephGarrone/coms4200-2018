@@ -1,69 +1,40 @@
 package org.coms4200.app;
-import org.apache.felix.scr.annotations.Activate;
-import org.apache.felix.scr.annotations.Component;
-import org.apache.felix.scr.annotations.Deactivate;
-import org.apache.felix.scr.annotations.Service;
-import org.onlab.packet.IpAddress;
+import org.apache.felix.scr.annotations.*;
+import org.onlab.packet.Ethernet;
 import org.onlab.packet.MacAddress;
+import org.onosproject.core.ApplicationId;
+import org.onosproject.core.CoreService;
 import org.onosproject.net.Device;
-import org.onosproject.net.flow.DefaultFlowRule;
-import org.onosproject.net.flow.DefaultTrafficTreatment;
-import org.onosproject.net.flow.FlowRule;
-import org.onosproject.net.flow.TrafficTreatment;
-import org.onosproject.net.packet.OutboundPacket;
+import org.onosproject.net.DeviceId;
+import org.onosproject.net.Port;
+import org.onosproject.net.PortNumber;
+import org.onosproject.net.device.DeviceService;
+import org.onosproject.net.device.PortStatistics;
+import org.onosproject.net.flow.*;
+import org.onosproject.net.packet.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-//#################### Imported those ##################################
-// In order to use reference and deal with the core service
-// For step # 1
-import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.ReferenceCardinality;
-import org.onosproject.core.CoreService;
-import org.onosproject.net.packet.PacketService;
-import org.onosproject.core.ApplicationId;
-// In order to register at for the pkt-in event
-// For step # 2
-import org.onosproject.net.packet.PacketProcessor;
-import org.onosproject.net.packet.PacketContext;
-// In order you install matching rules (traffic selector)
-// For step # 3
-import org.onosproject.net.flow.DefaultTrafficSelector;
-import org.onosproject.net.flow.TrafficSelector;
-import org.onosproject.net.flow.FlowRuleService;
-// In order to get access to packet header
-// For step # 4
-import org.onlab.packet.Ethernet;
-import org.onosproject.net.packet.PacketPriority;
-import java.util.Optional;
-// In order to access the Pkt-In header
-//For step #5
-import org.onosproject.net.PortNumber;
-import org.onosproject.net.packet.InboundPacket;
-import org.onosproject.net.packet.OutboundPacket;
-import org.onlab.packet.IPv4;
-import org.onlab.packet.Ip4Address;
-import org.onlab.packet.IpAddress;
-import org.onlab.packet.ARP;
-import org.onosproject.net.flowobjective.DefaultForwardingObjective;
-import org.onosproject.net.flowobjective.FlowObjectiveService;
-import org.onosproject.net.flowobjective.ForwardingObjective;
-import org.onosproject.net.DeviceId;
-import org.onosproject.net.ConnectPoint;
-import java.util.Map;
+
 import java.util.HashMap;
-//#####################################################################
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 /**
  * Skeletal ONOS application component.
  */
 @Component(immediate = true)
 public class AppComponent {
     private final Logger log = LoggerFactory.getLogger(getClass());
+
     // 1#-------> You need to refer to the interface class in order register your component
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected CoreService coreService;
+
     // In order to add/delete matching rules of the selector
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected PacketService packetService;
+
     // PacketProcessor pktprocess; // To process incoming packets and use methods
     // of PacketProcess such as addProcessor and removeProcessor
     PacketProcessor pktprocess = new LearningSwitch();
@@ -72,16 +43,19 @@ public class AppComponent {
     Map<MacAddress, PortNumber> mytable = new HashMap<MacAddress, PortNumber>();
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected FlowRuleService flowRuleService;
-    //#############################
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected DeviceService deviceService;
+
+    private Map<Integer, PortStatisticsReaderTask> statTasks = new HashMap<>();
+
     @Activate
     protected void activate() {
-        // 2#-------> You need to register your component at the core
+        log.info("Starting");
+
         appId = coreService.registerApplication("org.coms4200.app");
-        // 3#-------> This is to add a listener for the pkt-in event with priority and process incoming pkts
         packetService.addProcessor(pktprocess, PacketProcessor.director(1));
-        // 4#-------> This is to add matching rules on incoming packets
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
-        // For example, here we just want ARP and IPv4 packets to be forwarded to this app
         selector.matchEthType(Ethernet.TYPE_ARP);
 
         packetService.requestPackets(selector.build(), PacketPriority.REACTIVE,
@@ -89,9 +63,46 @@ public class AppComponent {
         selector.matchEthType(Ethernet.TYPE_IPV4);
         packetService.requestPackets(selector.build(), PacketPriority.REACTIVE,
                 appId, Optional.empty());
+
+        // Start port statistics monitoring
+        Iterable<Device> devices = deviceService.getDevices();
+        for (Device dev : devices) {
+            List<Port> ports = deviceService.getPorts(dev.id());
+
+            for (Port port : ports) {
+                log.info("Fetching info for port " + port.number());
+                PortStatistics stats1 = deviceService.getStatisticsForPort(dev.id(), port.number());
+                PortStatistics stats2 = deviceService.getDeltaStatisticsForPort(dev.id(), port.number());
+
+                if (stats1 != null) {
+                    log.info("Port " + port.number() + " " + stats1.bytesReceived() + " bytes received");
+                } else {
+                    log.info("Port " + port.number() + " unable to read statistics");
+                }
+
+                if (stats2 != null) {
+                    log.info("Port " + port.number() + " " + stats2.bytesReceived() + "  delta bytes received");
+                } else {
+                    log.info("Port " + port.number() + " unable to read delta statistics");
+                }
+
+                if (stats1 != null) {
+                    PortStatisticsReaderTask task = new PortStatisticsReaderTask();
+                    task.setDelay(3);
+                    task.setExit(false);
+                    task.setPort(stats1.port());
+                    task.setDeviceService(deviceService);
+                    task.setDevice(dev);
+                    task.schedule();
+
+                    statTasks.put(stats1.port(), task);
+                }
+            }
+        }
+
         log.info("Started");
     }
-    // 5#-------> Override the packeProcessor class in order to change whatever methods you like
+
     private class LearningSwitch implements PacketProcessor {
         @Override
         public void process(PacketContext pktIn) {
@@ -140,14 +151,18 @@ public class AppComponent {
 
     @Deactivate
     protected void deactivate() {
-        // 6#-------> You should add this removal to delete the listener
-        // and delete the rules once the you deactivate the app
         log.info("Stopped");
         packetService.removeProcessor(pktprocess);
         flowRuleService.removeFlowRulesById(appId);
+
+        for (PortStatisticsReaderTask task : statTasks.values()) {
+            task.setExit(true);
+            task.getTimer().cancel();
+        }
+
         withdrawIntercepts();
     }
-    // 7#---------> You need to cancel the all selectors
+
     private void withdrawIntercepts() {
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchEthType(Ethernet.TYPE_IPV4);
