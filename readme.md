@@ -96,8 +96,12 @@ This project simulates a network via Mininet and forwards OpenFlow data to Elast
 3. In terminal #2 (Mininet CLI)
     ```bash
     sudo mn --topo single,3 --mac --controller remote
-    # Or other applicable `mn` command
     ```
+    _or (if you want a more advanced network)_
+    ```bash
+    sudo python <repo>/mininet/performanceNetwork.py
+    ```
+    > **NOTE**: If you screw up your network interfaces run `sudo mn -c` to clean them up
 4. In terminal #3 (Onos CLI)
     ```bash
     onos localhost
