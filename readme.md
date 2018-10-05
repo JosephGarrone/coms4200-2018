@@ -77,9 +77,9 @@ This project simulates a network via Mininet and forwards OpenFlow data to Elast
     ```
 15. Activate the application and de-activate conflicting ones:
     ```bash
-    onos> apps activate org.coms4200.app
-    onos> apps deactivate org.onosproject.fwd
-    onos> apps deactivate org.onosproject.proxyarp
+    onos> app activate org.coms4200.app
+    onos> app deactivate org.onosproject.fwd
+    onos> app deactivate org.onosproject.proxyarp
     ```
 16. Access Kibana at:
     ```bash
@@ -105,4 +105,8 @@ This project simulates a network via Mininet and forwards OpenFlow data to Elast
 5. In terminal #4 (General purpose)
     ```bash
     onos localhost install path/to/coms4200-1.10.0.oar
+    ```
+    _or (to reinstall and immediately activate)_
+    ```bash
+    onos localhost reinstall! path/to/coms4200-1.10.0.oar
     ```

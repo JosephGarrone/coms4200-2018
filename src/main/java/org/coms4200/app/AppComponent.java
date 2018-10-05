@@ -75,20 +75,8 @@ public class AppComponent {
                 PortStatistics stats2 = deviceService.getDeltaStatisticsForPort(dev.id(), port.number());
 
                 if (stats1 != null) {
-                    log.info("Port " + port.number() + " " + stats1.bytesReceived() + " bytes received");
-                } else {
-                    log.info("Port " + port.number() + " unable to read statistics");
-                }
-
-                if (stats2 != null) {
-                    log.info("Port " + port.number() + " " + stats2.bytesReceived() + "  delta bytes received");
-                } else {
-                    log.info("Port " + port.number() + " unable to read delta statistics");
-                }
-
-                if (stats1 != null) {
                     PortStatisticsReaderTask task = new PortStatisticsReaderTask();
-                    task.setDelay(3);
+                    task.setDelay(1);
                     task.setExit(false);
                     task.setPort(stats1.port());
                     task.setDeviceService(deviceService);
