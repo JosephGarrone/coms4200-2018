@@ -1,8 +1,5 @@
 package org.coms4200.app;
 
-import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
-import org.elasticsearch.action.index.IndexRequest;
-import org.elasticsearch.client.RestHighLevelClient;
 import org.onosproject.net.Device;
 import org.onosproject.net.Port;
 import org.onosproject.net.device.DeviceService;
@@ -10,7 +7,6 @@ import org.onosproject.net.device.PortStatistics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Timer;
@@ -25,15 +21,13 @@ public class PortStatisticsReaderTask {
     private boolean exit = false;
     private long delay;
     private int port;
+    private int deviceIndex;
     private PortStatistics portStatistics;
     private Device device;
     private Timer timer = new Timer();
     protected DeviceService deviceService;
 
-    RestHighLevelClient client;
-
-    public PortStatisticsReaderTask(RestHighLevelClient client) {
-        this.client = client;
+    public PortStatisticsReaderTask() {
     }
 
     public boolean isExit() {
@@ -84,6 +78,14 @@ public class PortStatisticsReaderTask {
         this.getTimer().schedule(new Task(), 0, 1000);
     }
 
+    public int getDeviceIndex() {
+        return deviceIndex;
+    }
+
+    public void setDeviceIndex(int deviceIndex) {
+        this.deviceIndex = deviceIndex;
+    }
+
     class Task extends TimerTask {
         public Device getDevice() {
             return device;
@@ -113,6 +115,7 @@ public class PortStatisticsReaderTask {
 
                         if (secondRun) {
                             CalculatedPortStatistics statistics = new CalculatedPortStatistics(stats, currentMillis - lastMillis);
+                            statistics.pushToElastic();
                             log.info("Port Statistics\nDevice: " + device.id() + "\n" + statistics.toString("\t"));
                         } else {
                             secondRun = true;
@@ -238,7 +241,8 @@ public class PortStatisticsReaderTask {
             StringBuilder builder = new StringBuilder();
             builder.append("{");
             builder.append("\"timestamp\":\"" + Instant.now() + "\",");
-            builder.append("\"device\":" + device.id() + ",");
+            builder.append("\"device\":\"" + device.id() + "\",");
+            builder.append("\"device_index\":" + getDeviceIndex() + ",");
             builder.append("\"port\":" + port + ",");
             builder.append("\"time_delta\":" + getElapsedSeconds() + ",");
             builder.append("\"bytes_received\":" + statistics.bytesReceived() + ",");
@@ -291,13 +295,11 @@ public class PortStatisticsReaderTask {
             return toString("");
         }
 
-        public void PushToElastic() {
-            try {
-                IndexRequest request = new IndexRequest("port", "stats", toJson());
-                client.index(request);
-            } catch (IOException ex) {
-                // YIKE
-            }
+        public void pushToElastic() {
+            PutRequest request = new PutRequest("http://localhost:9200/stats/port/" + getDeviceIndex() + "_" + port, toJson());
+            String response = request.execute();
+
+            log.info("Device: " + device.id() + " Port: " + port + ", Pushed with response: " + response);
         }
     }
 }
