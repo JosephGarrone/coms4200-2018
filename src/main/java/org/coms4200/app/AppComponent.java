@@ -1,5 +1,15 @@
 package org.coms4200.app;
 import org.apache.felix.scr.annotations.*;
+import org.apache.http.HttpHost;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
+import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
+import org.elasticsearch.client.Response;
+import org.elasticsearch.client.RestClient;
+import org.elasticsearch.client.RestHighLevelClient;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.MacAddress;
 import org.onosproject.core.ApplicationId;
@@ -15,6 +25,7 @@ import org.onosproject.net.packet.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +60,9 @@ public class AppComponent {
 
     private Map<Integer, PortStatisticsReaderTask> statTasks = new HashMap<>();
 
+    private CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+    private RestHighLevelClient client;
+
     @Activate
     protected void activate() {
         log.info("Starting");
@@ -64,6 +78,23 @@ public class AppComponent {
         packetService.requestPackets(selector.build(), PacketPriority.REACTIVE,
                 appId, Optional.empty());
 
+        // Start ELK insertion session
+        credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials("",""));
+        client = new RestHighLevelClient(RestClient.builder()
+                .setHttpClientConfigCallback(httpAsyncClientBuilder -> httpAsyncClientBuilder.setDefaultCredentialsProvider(credentialsProvider)));
+
+        try {
+            Response response = client.getLowLevelClient().performRequest("HEAD", "/ports");
+            int statusCode = response.getStatusLine().getStatusCode();
+
+            if (statusCode == 404) {
+                CreateIndexRequest cir = new CreateIndexRequest("ports");
+                CreateIndexResponse cirsp = client.indices().create(cir);
+            }
+        } catch (IOException ex) {
+            // Do something? How about we just don't throw alright?
+        }
+
         // Start port statistics monitoring
         Iterable<Device> devices = deviceService.getDevices();
         for (Device dev : devices) {
@@ -75,7 +106,7 @@ public class AppComponent {
                 PortStatistics stats2 = deviceService.getDeltaStatisticsForPort(dev.id(), port.number());
 
                 if (stats1 != null) {
-                    PortStatisticsReaderTask task = new PortStatisticsReaderTask();
+                    PortStatisticsReaderTask task = new PortStatisticsReaderTask(client);
                     task.setDelay(1);
                     task.setExit(false);
                     task.setPort(stats1.port());
@@ -146,6 +177,12 @@ public class AppComponent {
         for (PortStatisticsReaderTask task : statTasks.values()) {
             task.setExit(true);
             task.getTimer().cancel();
+        }
+
+        try {
+            client.close();
+        } catch (IOException ex) {
+            // Yeet that outta here
         }
 
         withdrawIntercepts();

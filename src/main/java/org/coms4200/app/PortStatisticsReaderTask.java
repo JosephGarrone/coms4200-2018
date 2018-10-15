@@ -1,6 +1,8 @@
 package org.coms4200.app;
 
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
+import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.client.RestHighLevelClient;
 import org.onosproject.net.Device;
 import org.onosproject.net.Port;
 import org.onosproject.net.device.DeviceService;
@@ -8,6 +10,8 @@ import org.onosproject.net.device.PortStatistics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -25,6 +29,12 @@ public class PortStatisticsReaderTask {
     private Device device;
     private Timer timer = new Timer();
     protected DeviceService deviceService;
+
+    RestHighLevelClient client;
+
+    public PortStatisticsReaderTask(RestHighLevelClient client) {
+        this.client = client;
+    }
 
     public boolean isExit() {
         return exit;
@@ -224,6 +234,33 @@ public class PortStatisticsReaderTask {
             return statistics.packetsTxErrors() / getElapsedSeconds();
         }
 
+        public String toJson() {
+            StringBuilder builder = new StringBuilder();
+            builder.append("{");
+            builder.append("\"timestamp\":\"" + Instant.now() + "\",");
+            builder.append("\"device\":" + device.id() + ",");
+            builder.append("\"port\":" + port + ",");
+            builder.append("\"time_delta\":" + getElapsedSeconds() + ",");
+            builder.append("\"bytes_received\":" + statistics.bytesReceived() + ",");
+            builder.append("\"bytes_sent\":" + statistics.bytesSent() + ",");
+            builder.append("\"byte_receive_rate\":" + getByteReceiveRate() + ",");
+            builder.append("\"byte_send_rate\":" + getByteSendRate() + ",");
+            builder.append("\"packets_received\":" + statistics.packetsReceived() + ",");
+            builder.append("\"packets_sent\":" + statistics.packetsSent() + ",");
+            builder.append("\"packet_receive_rate\":" + getPacketReceiveRate() + ",");
+            builder.append("\"packet_send_rate\":" + getPacketSendRate() + ",");
+            builder.append("\"packet_rx_dropped\":" + statistics.packetsRxDropped() + ",");
+            builder.append("\"packet_tx_dropped\":" + statistics.packetsTxDropped() + ",");
+            builder.append("\"packet_rx_drop_rate\":" + getPacketRxDropRate() + ",");
+            builder.append("\"packet_tx_drop_rate\":" + getPacketTxDropRate() + ",");
+            builder.append("\"packet_rx_errors\":" + statistics.packetsRxErrors() + ",");
+            builder.append("\"packet_tx_errors\":" + statistics.packetsTxErrors() + ",");
+            builder.append("\"packet_rx_error_rate\":" + getPacketRxErrorRate() + ",");
+            builder.append("\"packet_tx_error_rate\":" + getPacketTxErrorRate());
+            builder.append("}");
+            return builder.toString();
+        }
+
         public String toString(String indent) {
             StringBuilder builder = new StringBuilder();
             builder.append(indent + "Port: " + statistics.port() + "\n");
@@ -255,7 +292,12 @@ public class PortStatisticsReaderTask {
         }
 
         public void PushToElastic() {
-            CreateIndexRequest request = new CreateIndexRequest("port_statistics");
+            try {
+                IndexRequest request = new IndexRequest("port", "stats", toJson());
+                client.index(request);
+            } catch (IOException ex) {
+                // YIKE
+            }
         }
     }
 }
