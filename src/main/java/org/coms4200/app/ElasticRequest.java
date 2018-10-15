@@ -10,20 +10,20 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-public class PutRequest {
+public class ElasticRequest {
     private HttpURLConnection connection;
     private String address;
     private String content;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    public PutRequest(String address, String content) {
+    public ElasticRequest(String address, String content, String method) {
         this.address = address;
         this.content = content;
         try {
             URL url = new URL(address);
             connection = (HttpURLConnection)url.openConnection();
-            connection.setRequestMethod("PUT");
+            connection.setRequestMethod(method);
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setRequestProperty("Content-Length", "" + content.getBytes().length);
             connection.setRequestProperty("Content-Language", "en-US");

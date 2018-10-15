@@ -116,7 +116,7 @@ public class PortStatisticsReaderTask {
                         if (secondRun) {
                             CalculatedPortStatistics statistics = new CalculatedPortStatistics(stats, currentMillis - lastMillis);
                             statistics.pushToElastic();
-                            log.info("Port Statistics\nDevice: " + device.id() + "\n" + statistics.toString("\t"));
+                            //log.info("Port Statistics\nDevice: " + device.id() + "\n" + statistics.toString("\t"));
                         } else {
                             secondRun = true;
                         }
@@ -296,10 +296,8 @@ public class PortStatisticsReaderTask {
         }
 
         public void pushToElastic() {
-            PutRequest request = new PutRequest("http://localhost:9200/stats/port/" + getDeviceIndex() + "_" + port, toJson());
+            ElasticRequest request = new ElasticRequest("http://localhost:9200/stats/port/", toJson(), "POST");
             String response = request.execute();
-
-            log.info("Device: " + device.id() + " Port: " + port + ", Pushed with response: " + response);
         }
     }
 }
