@@ -106,8 +106,10 @@ This project simulates a network via Mininet and forwards OpenFlow data to Elast
     ```bash
     onos localhost
     ```
-5. In terminal #4 (General purpose)
+5. In terminal #4 (ELK + General purpose)
     ```bash
+    cd docker-elk
+    sudo docker-compose up -d
     onos localhost install path/to/coms4200-1.10.0.oar
     ```
     _or (to reinstall and immediately activate)_

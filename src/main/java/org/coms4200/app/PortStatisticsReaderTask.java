@@ -1,5 +1,6 @@
 package org.coms4200.app;
 
+import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
 import org.onosproject.net.Device;
 import org.onosproject.net.Port;
 import org.onosproject.net.device.DeviceService;
@@ -251,6 +252,10 @@ public class PortStatisticsReaderTask {
         @Override
         public String toString() {
             return toString("");
+        }
+
+        public void PushToElastic() {
+            CreateIndexRequest request = new CreateIndexRequest("port_statistics");
         }
     }
 }
